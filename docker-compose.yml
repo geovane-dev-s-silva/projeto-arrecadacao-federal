@@ -1,4 +1,5 @@
-version: "32.35.1"
+# Garante que tudo que n8n salva em /data aparece na sua pasta ./data local
+version: "3.7"
 
 services:
   n8n:
@@ -17,4 +18,14 @@ services:
       - N8N_PORT=5678
       - TZ=America/Sao_Paulo
     volumes:
-      - ./data:/data          # Garante que tudo que n8n salva em /data aparece na sua pasta ./data local
+      - ./data:/data
+      - ./scripts:/scripts
+
+  python:
+    build:
+      context: ./python
+    volumes:
+      - ./data:/data
+      - ./scripts:/scripts
+    working_dir: /scripts/python
+    container_name: python-executor
