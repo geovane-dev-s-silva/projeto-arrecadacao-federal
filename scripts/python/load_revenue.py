@@ -9,7 +9,6 @@ if not os.path.isfile(csv_path):
     print(f"Arquivo não encontrado: {csv_path}")
     exit(1)
 
-
 try:
     df = pd.read_csv('/data/raw/Arrecadacao_mensal_codigo_GRU.csv', sep=';', encoding='latin1')
     print(df.head())
