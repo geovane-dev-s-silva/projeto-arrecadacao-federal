@@ -24,6 +24,8 @@ services:
   python:
     build:
       context: ./python
+    ports:
+      - "8000:8000"
     volumes:
       - ./data:/data
       - ./scripts:/scripts
