@@ -1,0 +1,138 @@
+---
+title: "Dashboard de Arrecadação Federal"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    theme: readable
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(lubridate)
+library(DT)
+library(scales)
+
+# Caminho para o CSV
+arquivo_csv <- "C:\\Users\\User\\Documents\\ProjetoAnaliseIntegrada\\projeto-arrecadacao-federal\\data\\raw\\Arrecadacao_mensal_codigo_GRU_limpo.csv"
+
+# Leitura dos dados
+dados <- tryCatch({
+  read_csv(
+    arquivo_csv,
+    locale = locale(encoding = "Latin1", decimal_mark = ",", grouping_mark = "."),
+    col_types = cols(
+      Data = col_datetime(),
+      Codigo = col_character(),
+      Descricao = col_character(),
+      Valor = col_number()
+    )
+  )
+}, error = function(e) {
+  stop("Erro ao ler o arquivo: ", e$message)
+})
+
+# Verificação e preparação dos dados
+dados <- dados %>%
+  mutate(
+    Data = as.Date(Data),
+    Ano = year(Data),
+    Mes = month(Data, label = TRUE, abbr = FALSE),
+    AnoMes = floor_date(Data, "month")
+  )
+
+# Verifica problemas
+if (any(is.na(dados$Valor))) {
+  warning("Valores NA encontrados na coluna Valor")
+}
+
+# Resumo mensal
+resumo_mensal <- dados %>%
+  filter(!is.na(Valor)) %>%
+  group_by(AnoMes, Ano, Mes) %>%
+  summarise(
+    Arrecadacao = sum(Valor, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(AnoMes)
+
+# Resumo por categoria
+if ("Descricao" %in% names(dados)) {
+  resumo_categorias <- dados %>%
+    group_by(Categoria = Descricao) %>%
+    summarise(
+      Arrecadacao = sum(Valor, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    arrange(desc(Arrecadacao)) %>%
+    head(10)
+}
+
+# Sidebar com filtros
+sidebarPanel(
+  selectInput("ano", "Selecione o Ano:",
+              choices = unique(resumo_mensal$Ano),
+              selected = max(resumo_mensal$Ano)),
+  
+  sliderInput("meses", "Número de Meses:",
+              min = 1, max = 12, value = 6),
+  
+  actionButton("atualizar", "Atualizar Dados")
+)
+
+# Gráfico de evolução mensal
+renderPlot({
+  dados_filtrados <- resumo_mensal %>%
+    filter(Ano == input$ano) %>%
+    slice_max(order_by = AnoMes, n = input$meses)
+  
+  ggplot(dados_filtrados, aes(x = Mes, y = Arrecadacao)) +
+    geom_col(fill = "#1f77b4") +
+    scale_y_continuous(labels = scales::dollar_format(prefix = "R$ ", big.mark = ".", decimal.mark = ",")) +
+    labs(title = paste("Arrecadação em", input$ano),
+         x = "Mês",
+         y = "Arrecadação") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+})
+
+# Tabela com os dados detalhados
+renderDataTable({
+  dados_filtrados <- dados %>%
+    filter(year(Data) == input$ano) %>%
+    arrange(desc(Data))
+  
+  datatable(
+    dados_filtrados %>%
+      select(Data, Codigo, Descricao, Valor) %>%
+      mutate(Valor = format(round(Valor, 2), nsmall = 2, big.mark = ".", decimal.mark = ",")),
+    options = list(
+      pageLength = 10,
+      language = list(url = '//cdn.datatables.net/plug-ins/1.10.11/i18n/Portuguese-Brasil.json')
+    ),
+    colnames = c('Data', 'Código', 'Descrição', 'Valor (R$)'),
+    rownames = FALSE
+  )
+})
+
+# Gráfico de top categorias
+renderPlot({
+  dados %>%
+    filter(year(Data) == input$ano) %>%
+    group_by(Descricao) %>%
+    summarise(Arrecadacao = sum(Valor, na.rm = TRUE)) %>%
+    arrange(desc(Arrecadacao)) %>%
+    head(10) %>%
+    ggplot(aes(x = reorder(Descricao, Arrecadacao), y = Arrecadacao)) +
+    geom_col(fill = "#1f77b4") +
+    scale_y_continuous(labels = scales::dollar_format(prefix = "R$ ", big.mark = ".", decimal.mark = ",")) +
+    coord_flip() +
+    labs(title = "Top 10 Categorias",
+         x = "",
+         y = "Arrecadação") +
+    theme_minimal()
+})
