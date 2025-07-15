@@ -1,7 +1,3 @@
-Com certeza! Abaixo está um modelo de `README.md` para seu projeto de **automação e análise de dados de arrecadação federal com n8n, Python e R**, explicando as etapas e a estrutura de forma clara.
-
----
-
 ## 📊 Projeto de Análise Integrada de Arrecadação Federal
 
 Este projeto realiza a **automação de download, processamento e visualização de dados de arrecadação federal** utilizando uma arquitetura integrada com:
